@@ -1,22 +1,46 @@
 import streamlit as st
 import pandas as pd
-import base64
 
-# 1. CONFIGURATION & DESIGN DYNAMIQUE
+# 1. CONFIGURATION & DESIGN DYNAMIQUE (TOUJOURS EN PREMIER)
 st.set_page_config(page_title="AlphaProject | Master Dashboard", layout="wide", page_icon="🛡️")
 
-# --- AJOUT LOGO ET SIGNATURE DANS LA SIDEBAR (HAUT À GAUCHE) ---
-with st.sidebar:
-    # Encodage de l'image locale pour l'affichage
-    try:
-        with open("téléchargement.png", "rb") as f:
-            data = f.read()
-            bin_str = base64.b64encode(data).decode()
-        st.image(f"data:image/png;base64,{bin_str}", use_container_width=True)
-    except:
-        st.error("Logo introuvable (téléchargement.png)")
+# --- GESTION DE L'AUTHENTIFICATION ---
+if 'authenticated' not in st.session_state:
+    st.session_state.authenticated = False
+
+# --- INTERFACE DE LOGIN ---
+if not st.session_state.authenticated:
+    st.markdown("""
+        <div style='text-align: center; margin-top: 100px; margin-bottom: 50px;'>
+            <h1 style='font-family: sans-serif; color: #0ea5e9; font-size: 3rem; font-weight: 800;'>🛡️ AlphaProject</h1>
+            <p style='color: #64748B; font-size: 1.2rem;'>Accès sécurisé au Master Dashboard</p>
+        </div>
+    """, unsafe_allow_html=True)
     
-    # Signature stylisée
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("login_form"):
+            st.markdown("### 🔐 Connexion Administrateur")
+            username = st.text_input("👤 Utilisateur", placeholder="Entrez votre identifiant")
+            password = st.text_input("🔑 Mot de passe", type="password", placeholder="Entrez votre mot de passe")
+            submit = st.form_submit_button("Se connecter", use_container_width=True)
+            
+            if submit:
+                if username == "AlphaProject" and password == "Alpha2026":
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("❌ Identifiants incorrects. Accès refusé.")
+    
+    st.stop()
+
+# --- SI AUTHENTIFIÉ, AFFICHER LE DASHBOARD ---
+
+# --- AJOUT LOGO (LIEN WEB) ET SIGNATURE DANS LA SIDEBAR ---
+with st.sidebar:
+    logo_url = "https://image2url.com/r2/default/images/1775131743507-3e439d6b-9a7e-4a24-be34-477b9b6f6fee.png"
+    st.image(logo_url, use_container_width=True)
+    
     st.markdown("""
         <div style="text-align: center; margin-top: -15px; margin-bottom: 20px;">
             <h3 style="color: #0ea5e9; font-family: sans-serif; letter-spacing: 2px;">TL SETUP</h3>
@@ -24,10 +48,17 @@ with st.sidebar:
             <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(0,0,0,0), rgba(14,165,233,0.75), rgba(0,0,0,0));">
         </div>
     """, unsafe_allow_html=True)
+    
+    # Ajout d'un bouton de déconnexion
+    st.markdown("---")
+    if st.button("🚪 Se déconnecter", use_container_width=True):
+        st.session_state.authenticated = False
+        st.rerun()
 
 # CSS Adaptatif
 st.markdown("""
     <style>
+    /* Style pour les cartes de métriques */
     div[data-testid="stMetric"] {
         background-color: rgba(128, 128, 128, 0.05);
         border: 1px solid rgba(128, 128, 128, 0.2);
@@ -37,7 +68,9 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab-list"] { gap: 20px; }
     .stTabs [data-baseweb="tab"] { font-weight: 600; }
-    .stApp { transition: background-color 0.3s ease; }
+    
+    /* Ajustement de l'espacement du conteneur principal */
+    .block-container { padding-top: 1.5rem; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -51,6 +84,16 @@ AGENTS = {
     "Isaia": f"{BASE_URL}913015590",
     "Toky": f"{BASE_URL}770981752",
     "Zara": f"{BASE_URL}718675776"
+}
+
+# Dictionnaire des lignes de départ pour chaque agent
+START_ROWS = {
+    "Vanja": 8,
+    "Jy N Aina": 541,
+    "Ny Haingo": 752,
+    "Isaia": 702,
+    "Toky": 435,
+    "Zara": 424
 }
 
 # 3. MOTEURS DE CALCUL
@@ -69,10 +112,17 @@ def format_seconds_to_hms(seconds):
     m, s = divmod(m, 60)
     return f"{h}:{m:02d}:{s:02d}"
 
+def format_number(num):
+    """Formate les nombres sans virgule, juste le nombre entier"""
+    if pd.isna(num):
+        return "0"
+    return f"{int(num):,}".replace(',', '')
+
 @st.cache_data(ttl=60)
-def load_data(url):
+def load_data(url, start_row):
     try:
-        df = pd.read_csv(url, header=None, skiprows=7)
+        # Lecture à partir de la ligne spécifique au lieu de skiprows=7
+        df = pd.read_csv(url, header=None, skiprows=start_row-1)
         df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
         df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
         df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
@@ -80,12 +130,22 @@ def load_data(url):
     except:
         return pd.DataFrame()
 
-# 4. LOGIQUE PRINCIPALE
-st.title("🛡️ AlphaProject : Suivi Setup")
+# 4. LOGIQUE PRINCIPALE - TITRE TRÈS VISIBLE ET ALIGNÉ À GAUCHE
+st.markdown("""
+    <div style='text-align: left; margin-bottom: 30px; border-left: 8px solid #0ea5e9; padding-left: 15px;'>
+        <h1 style='font-family: sans-serif; color: #1E293B; font-size: 2.2rem; margin: 0; font-weight: 800;'>
+            🛡️ AlphaProject
+        </h1>
+        <p style='color: #64748B; font-size: 1.1rem; margin: 0; font-weight: 500;'>
+            Master Dashboard | Suivi & Performance Setup
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 all_data = []
 for name, url in AGENTS.items():
-    temp_df = load_data(url)
+    start_row = START_ROWS[name]
+    temp_df = load_data(url, start_row)
     if not temp_df.empty:
         temp_df['Agent_Name'] = name
         all_data.append(temp_df)
@@ -94,7 +154,7 @@ if all_data:
     df_global_raw = pd.concat(all_data)
     df_global_valid = df_global_raw[df_global_raw['DATE_DT'].notna() & df_global_raw['Total_Sec'].notna()].copy()
 
-    # SIDEBAR SUITE
+    # FILTRE TEMPOREL DANS LA SIDEBAR
     st.sidebar.markdown("### 📅 Filtre Temporel")
     min_d, max_d = df_global_valid['DATE_DT'].min().date(), df_global_valid['DATE_DT'].max().date()
     date_range = st.sidebar.date_input("Période", value=(min_d, max_d))
@@ -108,8 +168,8 @@ if all_data:
     st.sidebar.markdown("---")
     agent_focus = st.sidebar.selectbox("👤 Focus Individuel", list(AGENTS.keys()))
 
-    # ONGLETS
-    t_master, t1, t2, t3 = st.tabs(["🏆 Résumé Agents", "📊 Détails Tâches", "📈 Charge Journalière", "🔬 Audit Qualité"])
+    # ONGLETS D'AFFICHAGE
+    t_master, t_taches, t1, t2, t3 = st.tabs(["🏆 Résumé Agents", "📋 Résumé Tâches", "📊 Détails Tâches", "📈 Charge Journalière", "🔬 Audit Qualité"])
 
     with t_master:
         total_s_eq = df_filtered['Total_Sec'].sum()
@@ -117,7 +177,7 @@ if all_data:
         
         c_g1, c_g2 = st.columns(2)
         c_g1.metric("Volume Total Équipe", format_seconds_to_hms(total_s_eq))
-        c_g2.metric("Total Setups", f"{len(df_filtered)} unités")
+        c_g2.metric("Total Setups", f"{len(df_filtered)}")
         
         summary = df_filtered.groupby('Agent_Name')['Total_Sec'].agg(['sum', 'mean', 'max', 'min', 'count'])
         summary['Prod (U/h)'] = (summary['count'] / (summary['sum'] / 3600)).round(2)
@@ -126,12 +186,53 @@ if all_data:
         summary['Max'] = summary['max'].apply(format_seconds_to_hms)
         summary['Min'] = summary['min'].apply(format_seconds_to_hms)
         
-        summary = summary.rename(columns={'count': 'Unités'}).sort_values(by='Unités', ascending=False)
-        st.dataframe(summary[['Unités', 'Temps Total', 'Moyenne', 'Max', 'Min', 'Prod (U/h)']], use_container_width=True)
+        summary = summary.rename(columns={'count': 'Nombre de tâches'}).sort_values(by='Nombre de tâches', ascending=False)
+        
+        # Formatage des nombres sans virgules
+        display_summary = summary.copy()
+        display_summary['Nombre de tâches'] = display_summary['Nombre de tâches'].apply(lambda x: f"{int(x)}")
+        display_summary['Prod (U/h)'] = display_summary['Prod (U/h)'].apply(lambda x: f"{x:.2f}")
+        
+        st.dataframe(display_summary[['Nombre de tâches', 'Temps Total', 'Moyenne', 'Max', 'Min', 'Prod (U/h)']], use_container_width=True)
         
         col_c1, col_c2 = st.columns(2)
-        with col_c1: st.bar_chart(summary['Unités'], color="#0ea5e9")
-        with col_c2: st.bar_chart(summary['Prod (U/h)'], color="#0284c7")
+        with col_c1: 
+            st.bar_chart(summary['Nombre de tâches'], color="#0ea5e9")
+        with col_c2: 
+            st.bar_chart(summary['Prod (U/h)'], color="#0284c7")
+
+    with t_taches:
+        total_s_eq = df_filtered['Total_Sec'].sum()
+        st.subheader("📋 Résumé des Tâches - Performance par Type")
+        
+        c_g1, c_g2 = st.columns(2)
+        c_g1.metric("Volume Total Équipe", format_seconds_to_hms(total_s_eq))
+        c_g2.metric("Total Setups", f"{len(df_filtered)}")
+        
+        # Agrégation par type de tâche
+        task_summary = df_filtered.groupby('Tâches')['Total_Sec'].agg(['sum', 'mean', 'max', 'min', 'count'])
+        task_summary['Prod (U/h)'] = (task_summary['count'] / (task_summary['sum'] / 3600)).round(2)
+        task_summary['Temps Total'] = task_summary['sum'].apply(format_seconds_to_hms)
+        task_summary['Moyenne'] = task_summary['mean'].apply(format_seconds_to_hms)
+        task_summary['Max'] = task_summary['max'].apply(format_seconds_to_hms)
+        task_summary['Min'] = task_summary['min'].apply(format_seconds_to_hms)
+        
+        task_summary = task_summary.rename(columns={'count': 'Nombre de tâches'}).sort_values(by='Nombre de tâches', ascending=False)
+        
+        # Formatage des nombres sans virgules
+        display_task_summary = task_summary.copy()
+        display_task_summary['Nombre de tâches'] = display_task_summary['Nombre de tâches'].apply(lambda x: f"{int(x)}")
+        display_task_summary['Prod (U/h)'] = display_task_summary['Prod (U/h)'].apply(lambda x: f"{x:.2f}")
+        
+        st.dataframe(display_task_summary[['Nombre de tâches', 'Temps Total', 'Moyenne', 'Max', 'Min', 'Prod (U/h)']], use_container_width=True)
+        
+        col_t1, col_t2 = st.columns(2)
+        with col_t1: 
+            st.bar_chart(task_summary['Nombre de tâches'], color="#0ea5e9")
+            st.caption("📊 Nombre de tâches par type")
+        with col_t2: 
+            st.bar_chart(task_summary['Prod (U/h)'], color="#0284c7")
+            st.caption("⚡ Productivité horaire par type de tâche")
 
     # FOCUS INDIVIDUEL
     df_agent = df_filtered[df_filtered['Agent_Name'] == agent_focus]
@@ -151,7 +252,9 @@ if all_data:
                 st_df['Total'] = st_df['sum'].apply(format_seconds_to_hms)
                 st_df['Max'] = st_df['max'].apply(format_seconds_to_hms)
                 st_df['Min'] = st_df['min'].apply(format_seconds_to_hms)
-                st.dataframe(st_df[['Moyenne', 'Total', 'Max', 'Min', 'count']], use_container_width=True)
+                display_st_df = st_df.copy()
+                display_st_df['count'] = display_st_df['count'].apply(lambda x: f"{int(x)}")
+                st.dataframe(display_st_df[['Moyenne', 'Total', 'Max', 'Min', 'count']], use_container_width=True)
 
     with t2:
         st.subheader(f"Flux temporel : {agent_focus}")
