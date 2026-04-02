@@ -112,16 +112,9 @@ def format_seconds_to_hms(seconds):
     m, s = divmod(m, 60)
     return f"{h}:{m:02d}:{s:02d}"
 
-def format_number(num):
-    """Formate les nombres sans virgule, juste le nombre entier"""
-    if pd.isna(num):
-        return "0"
-    return f"{int(num):,}".replace(',', '')
-
 @st.cache_data(ttl=60)
 def load_data(url, start_row):
     try:
-        # Lecture à partir de la ligne spécifique au lieu de skiprows=7
         df = pd.read_csv(url, header=None, skiprows=start_row-1)
         df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
         df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
@@ -188,7 +181,6 @@ if all_data:
         
         summary = summary.rename(columns={'count': 'Nombre de tâches'}).sort_values(by='Nombre de tâches', ascending=False)
         
-        # Formatage des nombres sans virgules
         display_summary = summary.copy()
         display_summary['Nombre de tâches'] = display_summary['Nombre de tâches'].apply(lambda x: f"{int(x)}")
         display_summary['Prod (U/h)'] = display_summary['Prod (U/h)'].apply(lambda x: f"{x:.2f}")
@@ -209,7 +201,6 @@ if all_data:
         c_g1.metric("Volume Total Équipe", format_seconds_to_hms(total_s_eq))
         c_g2.metric("Total Setups", f"{len(df_filtered)}")
         
-        # Agrégation par type de tâche
         task_summary = df_filtered.groupby('Tâches')['Total_Sec'].agg(['sum', 'mean', 'max', 'min', 'count'])
         task_summary['Prod (U/h)'] = (task_summary['count'] / (task_summary['sum'] / 3600)).round(2)
         task_summary['Temps Total'] = task_summary['sum'].apply(format_seconds_to_hms)
@@ -219,7 +210,6 @@ if all_data:
         
         task_summary = task_summary.rename(columns={'count': 'Nombre de tâches'}).sort_values(by='Nombre de tâches', ascending=False)
         
-        # Formatage des nombres sans virgules
         display_task_summary = task_summary.copy()
         display_task_summary['Nombre de tâches'] = display_task_summary['Nombre de tâches'].apply(lambda x: f"{int(x)}")
         display_task_summary['Prod (U/h)'] = display_task_summary['Prod (U/h)'].apply(lambda x: f"{x:.2f}")
@@ -266,7 +256,8 @@ if all_data:
         if not df_err.empty:
             st.warning(f"🚨 {len(df_err)} lignes incomplètes.")
             st.table(df_err[['DATE', 'Matchs', 'Tâches', 'Total']])
-        else: st.success(f"✅ Audit conforme.")
+        else: 
+            st.success(f"✅ Audit conforme.")
         with st.expander("Détails des logs"):
             st.dataframe(df_agent.drop(columns=['Agent_Name', 'Total_Sec']), use_container_width=True)
 else:
