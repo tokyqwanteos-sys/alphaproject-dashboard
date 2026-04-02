@@ -10,6 +10,9 @@ if 'authenticated' not in st.session_state:
     
 if 'dashboard_type' not in st.session_state:
     st.session_state.dashboard_type = "TL SETUP"
+    
+if 'user_role' not in st.session_state:
+    st.session_state.user_role = None
 
 # --- INTERFACE DE LOGIN ---
 if not st.session_state.authenticated:
@@ -23,7 +26,7 @@ if not st.session_state.authenticated:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login_form"):
-            st.markdown("### 🔐 Connexion Administrateur")
+            st.markdown("### 🔐 Connexion")
             username = st.text_input("👤 Utilisateur", placeholder="Entrez votre identifiant")
             password = st.text_input("🔑 Mot de passe", type="password", placeholder="Entrez votre mot de passe")
             submit = st.form_submit_button("Se connecter", use_container_width=True)
@@ -31,6 +34,11 @@ if not st.session_state.authenticated:
             if submit:
                 if username == "AlphaProject" and password == "Alpha2026":
                     st.session_state.authenticated = True
+                    st.session_state.user_role = "admin"
+                    st.rerun()
+                elif username == "Toky" and password == "Admin2026":
+                    st.session_state.authenticated = True
+                    st.session_state.user_role = "toky"
                     st.rerun()
                 else:
                     st.error("❌ Identifiants incorrects. Accès refusé.")
@@ -52,25 +60,27 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
     
-    # Sélecteur de dashboard
-    st.markdown("### 📊 Navigation")
-    dashboard_option = st.radio(
-        "Choisir le Dashboard",
-        ["TL SETUP", "Match & Prod Setup"],
-        index=0 if st.session_state.dashboard_type == "TL SETUP" else 1
-    )
-    
-    if dashboard_option == "TL SETUP" and st.session_state.dashboard_type != "TL SETUP":
-        st.session_state.dashboard_type = "TL SETUP"
-        st.rerun()
-    elif dashboard_option == "Match & Prod Setup" and st.session_state.dashboard_type != "Match & Prod Setup":
-        st.session_state.dashboard_type = "Match & Prod Setup"
-        st.rerun()
+    # Sélecteur de dashboard (uniquement pour admin)
+    if st.session_state.user_role == "admin":
+        st.markdown("### 📊 Navigation")
+        dashboard_option = st.radio(
+            "Choisir le Dashboard",
+            ["TL SETUP", "Match & Prod Setup"],
+            index=0 if st.session_state.dashboard_type == "TL SETUP" else 1
+        )
+        
+        if dashboard_option == "TL SETUP" and st.session_state.dashboard_type != "TL SETUP":
+            st.session_state.dashboard_type = "TL SETUP"
+            st.rerun()
+        elif dashboard_option == "Match & Prod Setup" and st.session_state.dashboard_type != "Match & Prod Setup":
+            st.session_state.dashboard_type = "Match & Prod Setup"
+            st.rerun()
     
     # Bouton de déconnexion
     st.markdown("---")
     if st.button("🚪 Se déconnecter", use_container_width=True):
         st.session_state.authenticated = False
+        st.session_state.user_role = None
         st.rerun()
 
 # CSS Adaptatif Premium
@@ -88,7 +98,6 @@ st.markdown("""
         transform: translateY(-3px);
         box-shadow: 0 12px 28px rgba(14,165,233,0.2);
         border-color: rgba(14,165,233,0.6);
-        background: linear-gradient(135deg, rgba(14,165,233,0.18) 0%, rgba(14,165,233,0.08) 100%);
     }
     div[data-testid="stMetric"] label {
         font-weight: 700 !important;
@@ -118,25 +127,18 @@ st.markdown("""
         color: white !important;
     }
     .block-container { padding-top: 1.5rem; }
-    h1, h2, h3 {
-        font-family: 'Inter', sans-serif;
-    }
     .stDataFrame {
         border-radius: 16px;
         overflow: hidden;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
-    .stAlert {
-        border-radius: 12px;
-        border-left: 4px solid #0ea5e9;
-    }
     </style>
     """, unsafe_allow_html=True)
 
 # ============================================
-# DASHBOARD 1: TL SETUP (100% INCHANGÉ)
+# DASHBOARD ADMIN: TL SETUP (100% INCHANGÉ)
 # ============================================
-if st.session_state.dashboard_type == "TL SETUP":
+if st.session_state.user_role == "admin" and st.session_state.dashboard_type == "TL SETUP":
     BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9CwN6tKKroOoWtWwdtFAxhgqW1wMyUg0lrmU8eGtfyR1lSSVZOyg5siuxO9XkUf6WQxeeZ_IGc2uy/pub?single=true&output=csv&gid="
 
     AGENTS = {
@@ -309,9 +311,9 @@ if st.session_state.dashboard_type == "TL SETUP":
         st.error("Données indisponibles.")
 
 # ============================================
-# DASHBOARD 2: MATCH & PROD SETUP (PREMIUM)
+# DASHBOARD ADMIN: MATCH & PROD SETUP
 # ============================================
-elif st.session_state.dashboard_type == "Match & Prod Setup":
+elif st.session_state.user_role == "admin" and st.session_state.dashboard_type == "Match & Prod Setup":
     st.markdown("""
         <div style='text-align: left; margin-bottom: 30px; border-left: 8px solid #0ea5e9; padding-left: 15px;'>
             <h1 style='font-family: sans-serif; color: #1E293B; font-size: 2.2rem; margin: 0; font-weight: 800;'>🎯 Match & Prod Setup</h1>
@@ -355,11 +357,9 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
         except Exception as e:
             return pd.DataFrame()
     
-    # Chargement des données
     df_match = load_data_optimized(MATCH_URL, 2467)
     df_prod = load_data_optimized(PROD_URL, 1014)
     
-    # Filtre date unique pour les deux feuilles
     all_dates = []
     if not df_match.empty:
         all_dates.extend(df_match['DATE_DT'].dropna().tolist())
@@ -381,7 +381,6 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
         start_date, end_date = None, None
         st.sidebar.warning("⚠️ Aucune donnée chargée")
     
-    # Application du filtre unique
     if not df_match.empty and start_date and end_date:
         df_match_filtered = df_match[(df_match['DATE_DT'].dt.date >= start_date) & (df_match['DATE_DT'].dt.date <= end_date)]
     else:
@@ -392,13 +391,11 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
     else:
         df_prod_filtered = df_prod.copy() if not df_prod.empty else pd.DataFrame()
     
-    # Onglets: Résumé Global et Résumé par Type
     t_summary, t_match, t_prod = st.tabs(["📊 Résumé Global", "🎯 Analyse Match", "🚀 Analyse Production"])
     
     with t_summary:
         st.subheader("📊 Tableau de Bord Exécutif")
         
-        # Métriques globales
         col1, col2, col3, col4 = st.columns(4)
         
         total_match = len(df_match_filtered)
@@ -421,7 +418,6 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
         
         st.markdown("---")
         
-        # Graphiques comparatifs
         col_chart1, col_chart2 = st.columns(2)
         
         with col_chart1:
@@ -444,7 +440,6 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
         
         st.markdown("---")
         
-        # Top Performers
         st.subheader("🏆 Top Performers")
         
         col_perf1, col_perf2 = st.columns(2)
@@ -471,7 +466,6 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
         st.subheader("🎯 Analyse Détaillée - Match Setup")
         
         if not df_match_filtered.empty:
-            # Métriques
             col_a, col_b, col_c, col_d = st.columns(4)
             with col_a:
                 st.metric("📦 Total Matchs", f"{len(df_match_filtered):,}")
@@ -482,7 +476,6 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
             with col_d:
                 st.metric("👥 Agents Actifs", df_match_filtered['Agent'].nunique())
             
-            # Performance par agent
             st.subheader("📊 Performance par Agent")
             agent_stats = df_match_filtered.groupby('Agent')['Durée_Sec'].agg(['count', 'sum', 'mean']).round(2)
             agent_stats['Durée Totale'] = agent_stats['sum'].apply(format_duration)
@@ -491,7 +484,6 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
             agent_stats = agent_stats.sort_values('Nombre', ascending=False)
             st.dataframe(agent_stats[['Nombre', 'Durée Totale', 'Durée Moyenne']], use_container_width=True)
             
-            # Détails
             with st.expander("📋 Tous les logs Match", expanded=False):
                 display_df = df_match_filtered.drop(columns=['DATE_DT', 'Durée_Sec'])
                 st.dataframe(display_df, use_container_width=True, height=400)
@@ -502,7 +494,6 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
         st.subheader("🚀 Analyse Détaillée - Mis en Prod Setup")
         
         if not df_prod_filtered.empty:
-            # Métriques
             col_a, col_b, col_c, col_d = st.columns(4)
             with col_a:
                 st.metric("📦 Total Productions", f"{len(df_prod_filtered):,}")
@@ -513,7 +504,6 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
             with col_d:
                 st.metric("👥 Agents Actifs", df_prod_filtered['Agent'].nunique())
             
-            # Performance par agent
             st.subheader("📊 Performance par Agent")
             agent_stats = df_prod_filtered.groupby('Agent')['Durée_Sec'].agg(['count', 'sum', 'mean']).round(2)
             agent_stats['Durée Totale'] = agent_stats['sum'].apply(format_duration)
@@ -522,9 +512,243 @@ elif st.session_state.dashboard_type == "Match & Prod Setup":
             agent_stats = agent_stats.sort_values('Nombre', ascending=False)
             st.dataframe(agent_stats[['Nombre', 'Durée Totale', 'Durée Moyenne']], use_container_width=True)
             
-            # Détails
             with st.expander("📋 Tous les logs Production", expanded=False):
                 display_df = df_prod_filtered.drop(columns=['DATE_DT', 'Durée_Sec'])
                 st.dataframe(display_df, use_container_width=True, height=400)
         else:
             st.info("Aucune donnée Production disponible sur cette période")
+
+# ============================================
+# DASHBOARD TOKY: RÉSUMÉ PERSONNALISÉ
+# ============================================
+elif st.session_state.user_role == "toky":
+    st.markdown("""
+        <div style='text-align: left; margin-bottom: 30px; border-left: 8px solid #0ea5e9; padding-left: 15px;'>
+            <h1 style='font-family: sans-serif; color: #1E293B; font-size: 2.2rem; margin: 0; font-weight: 800;'>
+                👤 Toky | Performance Dashboard
+            </h1>
+            <p style='color: #64748B; font-size: 1.1rem; margin: 0; font-weight: 500;'>
+                Récapitulatif complet de vos activités sur toutes les plateformes
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # URLs des données
+    BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9CwN6tKKroOoWtWwdtFAxhgqW1wMyUg0lrmU8eGtfyR1lSSVZOyg5siuxO9XkUf6WQxeeZ_IGc2uy/pub?single=true&output=csv&gid="
+    
+    AGENTS_URLS = {
+        "Vanja": f"{BASE_URL}225155468",
+        "Jy N Aina": f"{BASE_URL}1253872710",
+        "Ny Haingo": f"{BASE_URL}919025018",
+        "Isaia": f"{BASE_URL}913015590",
+        "Toky": f"{BASE_URL}770981752",
+        "Zara": f"{BASE_URL}718675776"
+    }
+    
+    START_ROWS = {
+        "Vanja": 8,
+        "Jy N Aina": 541,
+        "Ny Haingo": 752,
+        "Isaia": 702,
+        "Toky": 435,
+        "Zara": 424
+    }
+    
+    MATCH_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRTXy8AtQMhFzGY-dEE1PrRKgKWaOfmBygmYgIFfJhpL4ivwo8djT1tfgRRyixprh5A858Gl4a8qdYH/pub?gid=225910839&single=true&output=csv"
+    PROD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRTXy8AtQMhFzGY-dEE1PrRKgKWaOfmBygmYgIFfJhpL4ivwo8djT1tfgRRyixprh5A858Gl4a8qdYH/pub?gid=2106899222&single=true&output=csv"
+    
+    def format_duration(seconds):
+        if pd.isna(seconds) or seconds <= 0:
+            return "0:00:00"
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        s = int(seconds % 60)
+        return f"{h}:{m:02d}:{s:02d}"
+    
+    def convert_to_seconds(time_val):
+        try:
+            if pd.isna(time_val) or str(time_val).strip() in ["", "0", "0:00:00"]: return 0.0
+            parts = str(time_val).strip().split(':')
+            if len(parts) == 3: return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+            elif len(parts) == 2: return int(parts[0])*60 + int(parts[1])
+            return 0.0
+        except: return None
+    
+    @st.cache_data(ttl=60)
+    def load_tl_data(url, start_row):
+        try:
+            df = pd.read_csv(url, header=None, skiprows=start_row-1)
+            df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
+            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+            df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
+            return df
+        except:
+            return pd.DataFrame()
+    
+    @st.cache_data(ttl=60)
+    def load_match_prod_data(url, start_row):
+        try:
+            df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
+            df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
+            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+            
+            def convert_duration(dur):
+                try:
+                    if pd.isna(dur) or str(dur).strip() == "":
+                        return 0.0
+                    parts = str(dur).strip().split(':')
+                    if len(parts) == 3:
+                        return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+                    elif len(parts) == 2:
+                        return int(parts[0])*60 + int(parts[1])
+                    return 0.0
+                except:
+                    return 0.0
+            
+            df['Durée_Sec'] = df['Durée'].apply(convert_duration)
+            return df
+        except Exception as e:
+            return pd.DataFrame()
+    
+    # Chargement des données Toky
+    tl_data = load_tl_data(AGENTS_URLS["Toky"], START_ROWS["Toky"])
+    match_data = load_match_prod_data(MATCH_URL, 2467)
+    prod_data = load_match_prod_data(PROD_URL, 1014)
+    
+    # Filtrage des données pour Toky uniquement
+    if not match_data.empty:
+        match_data = match_data[match_data['Agent'] == "Toky"]
+    if not prod_data.empty:
+        prod_data = prod_data[prod_data['Agent'] == "Toky"]
+    
+    # Filtre date
+    all_dates = []
+    if not tl_data.empty:
+        all_dates.extend(tl_data['DATE_DT'].dropna().tolist())
+    if not match_data.empty:
+        all_dates.extend(match_data['DATE_DT'].dropna().tolist())
+    if not prod_data.empty:
+        all_dates.extend(prod_data['DATE_DT'].dropna().tolist())
+    
+    if all_dates:
+        min_date = min(all_dates).date()
+        max_date = max(all_dates).date()
+        date_range = st.sidebar.date_input("📅 Période d'analyse", value=(min_date, max_date))
+        
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = date_range
+        else:
+            start_date, end_date = min_date, max_date
+        
+        if not tl_data.empty:
+            tl_data = tl_data[(tl_data['DATE_DT'].dt.date >= start_date) & (tl_data['DATE_DT'].dt.date <= end_date)]
+        if not match_data.empty:
+            match_data = match_data[(match_data['DATE_DT'].dt.date >= start_date) & (match_data['DATE_DT'].dt.date <= end_date)]
+        if not prod_data.empty:
+            prod_data = prod_data[(prod_data['DATE_DT'].dt.date >= start_date) & (prod_data['DATE_DT'].dt.date <= end_date)]
+    
+    # Création des onglets
+    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 TL Setup", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
+    
+    with t_tl:
+        st.subheader("📋 Vos activités - TL Setup")
+        
+        if not tl_data.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("📦 Total Setups", f"{len(tl_data):,}")
+            with col2:
+                st.metric("⏱️ Temps Total", format_duration(tl_data['Total_Sec'].sum()))
+            with col3:
+                st.metric("📊 Temps Moyen", format_duration(tl_data['Total_Sec'].mean()))
+            with col4:
+                prod = len(tl_data) / (tl_data['Total_Sec'].sum() / 3600) if tl_data['Total_Sec'].sum() > 0 else 0
+                st.metric("⚡ Productivité", f"{prod:.1f} U/h")
+            
+            st.subheader("📊 Répartition par type de tâche")
+            task_dist = tl_data['Tâches'].value_counts()
+            st.bar_chart(task_dist, color="#0ea5e9")
+            
+            with st.expander("📋 Détail de vos activités TL", expanded=False):
+                st.dataframe(tl_data.drop(columns=['DATE_DT', 'Total_Sec']), use_container_width=True)
+        else:
+            st.info("Aucune donnée TL Setup sur cette période")
+    
+    with t_match:
+        st.subheader("🎯 Vos activités - Match Setup")
+        
+        if not match_data.empty:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📦 Total Matchs", f"{len(match_data):,}")
+            with col2:
+                st.metric("⏱️ Temps Total", format_duration(match_data['Durée_Sec'].sum()))
+            with col3:
+                st.metric("📊 Temps Moyen", format_duration(match_data['Durée_Sec'].mean()))
+            
+            with st.expander("📋 Détail de vos activités Match", expanded=False):
+                st.dataframe(match_data.drop(columns=['DATE_DT', 'Durée_Sec']), use_container_width=True)
+        else:
+            st.info("Aucune donnée Match Setup sur cette période")
+    
+    with t_prod:
+        st.subheader("🚀 Vos activités - Mis en Prod Setup")
+        
+        if not prod_data.empty:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📦 Total Productions", f"{len(prod_data):,}")
+            with col2:
+                st.metric("⏱️ Temps Total", format_duration(prod_data['Durée_Sec'].sum()))
+            with col3:
+                st.metric("📊 Temps Moyen", format_duration(prod_data['Durée_Sec'].mean()))
+            
+            with st.expander("📋 Détail de vos activités Production", expanded=False):
+                st.dataframe(prod_data.drop(columns=['DATE_DT', 'Durée_Sec']), use_container_width=True)
+        else:
+            st.info("Aucune donnée Production sur cette période")
+    
+    with t_summary:
+        st.subheader("📊 Synthèse globale de vos performances")
+        
+        total_tl = len(tl_data) if not tl_data.empty else 0
+        total_match = len(match_data) if not match_data.empty else 0
+        total_prod = len(prod_data) if not prod_data.empty else 0
+        total_global = total_tl + total_match + total_prod
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("📊 Total Global", f"{total_global:,}")
+        with col2:
+            st.metric("📋 Total TL Setup", f"{total_tl:,}")
+        with col3:
+            st.metric("🎯 Total Match", f"{total_match:,}")
+        with col4:
+            st.metric("🚀 Total Prod", f"{total_prod:,}")
+        
+        st.markdown("---")
+        
+        col_chart1, col_chart2 = st.columns(2)
+        
+        with col_chart1:
+            st.markdown("### 📈 Évolution hebdomadaire")
+            all_data_weekly = []
+            if not tl_data.empty:
+                weekly_tl = tl_data.groupby(pd.Grouper(key='DATE_DT', freq='W')).size()
+                st.line_chart(weekly_tl, color="#0ea5e9")
+            else:
+                st.info("Aucune donnée")
+        
+        with col_chart2:
+            st.markdown("### 📊 Répartition des activités")
+            if total_global > 0:
+                repartition = pd.DataFrame({
+                    'Activité': ['TL Setup', 'Match Setup', 'Prod Setup'],
+                    'Nombre': [total_tl, total_match, total_prod]
+                })
+                st.bar_chart(repartition.set_index('Activité'), color="#0284c7")
+            else:
+                st.info("Aucune donnée")
+        
+        st.markdown("---")
+        st.caption(f"📅 Période analysée : {start_date} → {end_date}")
