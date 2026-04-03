@@ -60,7 +60,7 @@ if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
     
 if 'dashboard_type' not in st.session_state:
-    st.session_state.dashboard_type = "SETUP 2"
+    st.session_state.dashboard_type = "TL SETUP"
     
 if 'user_role' not in st.session_state:
     st.session_state.user_role = None
@@ -192,12 +192,12 @@ with st.sidebar:
         st.markdown("### 📊 Navigation")
         dashboard_option = st.radio(
             "Choisir le Dashboard",
-            ["SETUP 2", "Match & Prod Setup"],
-            index=0 if st.session_state.dashboard_type == "SETUP 2" else 1
+            ["TL SETUP", "Match & Prod Setup"],
+            index=0 if st.session_state.dashboard_type == "TL SETUP" else 1
         )
         
-        if dashboard_option == "SETUP 2" and st.session_state.dashboard_type != "SETUP 2":
-            st.session_state.dashboard_type = "SETUP 2"
+        if dashboard_option == "TL SETUP" and st.session_state.dashboard_type != "TL SETUP":
+            st.session_state.dashboard_type = "TL SETUP"
             st.rerun()
         elif dashboard_option == "Match & Prod Setup" and st.session_state.dashboard_type != "Match & Prod Setup":
             st.session_state.dashboard_type = "Match & Prod Setup"
@@ -269,9 +269,9 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ============================================
-# DASHBOARD ADMIN: SETUP 2 (100% INCHANGÉ)
+# DASHBOARD ADMIN: TL SETUP (100% INCHANGÉ)
 # ============================================
-if st.session_state.user_role == "admin" and st.session_state.dashboard_type == "SETUP 2":
+if st.session_state.user_role == "admin" and st.session_state.dashboard_type == "TL SETUP":
     BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9CwN6tKKroOoWtWwdtFAxhgqW1wMyUg0lrmU8eGtfyR1lSSVZOyg5siuxO9XkUf6WQxeeZ_IGc2uy/pub?single=true&output=csv&gid="
 
     AGENTS = {
@@ -773,10 +773,10 @@ elif st.session_state.user_role == "toky":
             prod_data = prod_data[(prod_data['DATE_DT'].dt.date >= start_date) & (prod_data['DATE_DT'].dt.date <= end_date)]
     
     # Création des onglets
-    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 SETUP 2", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
+    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 TL Setup", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
     
     with t_tl:
-        st.subheader("📋 Vos activités - SETUP 2")
+        st.subheader("📋 Vos activités - TL Setup")
         
         if not tl_data.empty:
             col1, col2, col3, col4 = st.columns(4)
@@ -797,7 +797,7 @@ elif st.session_state.user_role == "toky":
             with st.expander("📋 Détail de vos activités TL", expanded=False):
                 st.dataframe(tl_data.drop(columns=['DATE_DT', 'Total_Sec']), use_container_width=True)
         else:
-            st.info("Aucune donnée SETUP 2 sur cette période")
+            st.info("Aucune donnée TL Setup sur cette période")
     
     with t_match:
         st.subheader("🎯 Vos activités - Match Setup")
@@ -852,7 +852,7 @@ elif st.session_state.user_role == "toky":
         with col2:
             st.metric("⏱️ Temps Total Global", format_duration(temps_global))
         with col3:
-            st.metric("📋 Total SETUP 2", f"{total_tl:,}")
+            st.metric("📋 Total TL Setup", f"{total_tl:,}")
         with col4:
             st.metric("⏱️ Temps TL", format_duration(temps_tl))
         
@@ -882,7 +882,7 @@ elif st.session_state.user_role == "toky":
             st.markdown("### 📊 Répartition des activités")
             if total_global > 0:
                 repartition = pd.DataFrame({
-                    'Activité': ['SETUP 2', 'Match Setup', 'Prod Setup'],
+                    'Activité': ['TL Setup', 'Match Setup', 'Prod Setup'],
                     'Nombre': [total_tl, total_match, total_prod]
                 })
                 st.bar_chart(repartition.set_index('Activité'), color="#0284c7")
@@ -1018,10 +1018,10 @@ elif st.session_state.user_role == "isaia":
             prod_data = prod_data[(prod_data['DATE_DT'].dt.date >= start_date) & (prod_data['DATE_DT'].dt.date <= end_date)]
     
     # Création des onglets
-    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 SETUP 2", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
+    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 TL Setup", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
     
     with t_tl:
-        st.subheader("📋 Vos activités - SETUP 2")
+        st.subheader("📋 Vos activités - TL Setup")
         
         if not tl_data.empty:
             col1, col2, col3, col4 = st.columns(4)
@@ -1042,7 +1042,7 @@ elif st.session_state.user_role == "isaia":
             with st.expander("📋 Détail de vos activités TL", expanded=False):
                 st.dataframe(tl_data.drop(columns=['DATE_DT', 'Total_Sec']), use_container_width=True)
         else:
-            st.info("Aucune donnée SETUP 2 sur cette période")
+            st.info("Aucune donnée TL Setup sur cette période")
     
     with t_match:
         st.subheader("🎯 Vos activités - Match Setup")
@@ -1097,7 +1097,7 @@ elif st.session_state.user_role == "isaia":
         with col2:
             st.metric("⏱️ Temps Total Global", format_duration(temps_global))
         with col3:
-            st.metric("📋 Total SETUP 2", f"{total_tl:,}")
+            st.metric("📋 Total TL Setup", f"{total_tl:,}")
         with col4:
             st.metric("⏱️ Temps TL", format_duration(temps_tl))
         
@@ -1127,7 +1127,7 @@ elif st.session_state.user_role == "isaia":
             st.markdown("### 📊 Répartition des activités")
             if total_global > 0:
                 repartition = pd.DataFrame({
-                    'Activité': ['SETUP 2', 'Match Setup', 'Prod Setup'],
+                    'Activité': ['TL Setup', 'Match Setup', 'Prod Setup'],
                     'Nombre': [total_tl, total_match, total_prod]
                 })
                 st.bar_chart(repartition.set_index('Activité'), color="#0284c7")
@@ -1263,10 +1263,10 @@ elif st.session_state.user_role == "zara":
             prod_data = prod_data[(prod_data['DATE_DT'].dt.date >= start_date) & (prod_data['DATE_DT'].dt.date <= end_date)]
     
     # Création des onglets
-    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 SETUP 2", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
+    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 TL Setup", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
     
     with t_tl:
-        st.subheader("📋 Vos activités - SETUP 2")
+        st.subheader("📋 Vos activités - TL Setup")
         
         if not tl_data.empty:
             col1, col2, col3, col4 = st.columns(4)
@@ -1287,7 +1287,7 @@ elif st.session_state.user_role == "zara":
             with st.expander("📋 Détail de vos activités TL", expanded=False):
                 st.dataframe(tl_data.drop(columns=['DATE_DT', 'Total_Sec']), use_container_width=True)
         else:
-            st.info("Aucune donnée SETUP 2 sur cette période")
+            st.info("Aucune donnée TL Setup sur cette période")
     
     with t_match:
         st.subheader("🎯 Vos activités - Match Setup")
@@ -1342,7 +1342,7 @@ elif st.session_state.user_role == "zara":
         with col2:
             st.metric("⏱️ Temps Total Global", format_duration(temps_global))
         with col3:
-            st.metric("📋 Total SETUP 2", f"{total_tl:,}")
+            st.metric("📋 Total TL Setup", f"{total_tl:,}")
         with col4:
             st.metric("⏱️ Temps TL", format_duration(temps_tl))
         
@@ -1372,7 +1372,7 @@ elif st.session_state.user_role == "zara":
             st.markdown("### 📊 Répartition des activités")
             if total_global > 0:
                 repartition = pd.DataFrame({
-                    'Activité': ['SETUP 2', 'Match Setup', 'Prod Setup'],
+                    'Activité': ['TL Setup', 'Match Setup', 'Prod Setup'],
                     'Nombre': [total_tl, total_match, total_prod]
                 })
                 st.bar_chart(repartition.set_index('Activité'), color="#0284c7")
@@ -1508,10 +1508,10 @@ elif st.session_state.user_role == "vanja":
             prod_data = prod_data[(prod_data['DATE_DT'].dt.date >= start_date) & (prod_data['DATE_DT'].dt.date <= end_date)]
     
     # Création des onglets
-    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 SETUP 2", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
+    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 TL Setup", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
     
     with t_tl:
-        st.subheader("📋 Vos activités - SETUP 2")
+        st.subheader("📋 Vos activités - TL Setup")
         
         if not tl_data.empty:
             col1, col2, col3, col4 = st.columns(4)
@@ -1532,7 +1532,7 @@ elif st.session_state.user_role == "vanja":
             with st.expander("📋 Détail de vos activités TL", expanded=False):
                 st.dataframe(tl_data.drop(columns=['DATE_DT', 'Total_Sec']), use_container_width=True)
         else:
-            st.info("Aucune donnée SETUP 2 sur cette période")
+            st.info("Aucune donnée TL Setup sur cette période")
     
     with t_match:
         st.subheader("🎯 Vos activités - Match Setup")
@@ -1587,7 +1587,7 @@ elif st.session_state.user_role == "vanja":
         with col2:
             st.metric("⏱️ Temps Total Global", format_duration(temps_global))
         with col3:
-            st.metric("📋 Total SETUP 2", f"{total_tl:,}")
+            st.metric("📋 Total TL Setup", f"{total_tl:,}")
         with col4:
             st.metric("⏱️ Temps TL", format_duration(temps_tl))
         
@@ -1617,7 +1617,7 @@ elif st.session_state.user_role == "vanja":
             st.markdown("### 📊 Répartition des activités")
             if total_global > 0:
                 repartition = pd.DataFrame({
-                    'Activité': ['SETUP 2', 'Match Setup', 'Prod Setup'],
+                    'Activité': ['TL Setup', 'Match Setup', 'Prod Setup'],
                     'Nombre': [total_tl, total_match, total_prod]
                 })
                 st.bar_chart(repartition.set_index('Activité'), color="#0284c7")
@@ -1753,10 +1753,10 @@ elif st.session_state.user_role == "nyhaingo":
             prod_data = prod_data[(prod_data['DATE_DT'].dt.date >= start_date) & (prod_data['DATE_DT'].dt.date <= end_date)]
     
     # Création des onglets
-    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 SETUP 2", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
+    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 TL Setup", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
     
     with t_tl:
-        st.subheader("📋 Vos activités - SETUP 2")
+        st.subheader("📋 Vos activités - TL Setup")
         
         if not tl_data.empty:
             col1, col2, col3, col4 = st.columns(4)
@@ -1777,7 +1777,7 @@ elif st.session_state.user_role == "nyhaingo":
             with st.expander("📋 Détail de vos activités TL", expanded=False):
                 st.dataframe(tl_data.drop(columns=['DATE_DT', 'Total_Sec']), use_container_width=True)
         else:
-            st.info("Aucune donnée SETUP 2 sur cette période")
+            st.info("Aucune donnée TL Setup sur cette période")
     
     with t_match:
         st.subheader("🎯 Vos activités - Match Setup")
@@ -1832,7 +1832,7 @@ elif st.session_state.user_role == "nyhaingo":
         with col2:
             st.metric("⏱️ Temps Total Global", format_duration(temps_global))
         with col3:
-            st.metric("📋 Total SETUP 2", f"{total_tl:,}")
+            st.metric("📋 Total TL Setup", f"{total_tl:,}")
         with col4:
             st.metric("⏱️ Temps TL", format_duration(temps_tl))
         
@@ -1862,7 +1862,7 @@ elif st.session_state.user_role == "nyhaingo":
             st.markdown("### 📊 Répartition des activités")
             if total_global > 0:
                 repartition = pd.DataFrame({
-                    'Activité': ['SETUP 2', 'Match Setup', 'Prod Setup'],
+                    'Activité': ['TL Setup', 'Match Setup', 'Prod Setup'],
                     'Nombre': [total_tl, total_match, total_prod]
                 })
                 st.bar_chart(repartition.set_index('Activité'), color="#0284c7")
@@ -1998,10 +1998,10 @@ elif st.session_state.user_role == "jynyaina":
             prod_data = prod_data[(prod_data['DATE_DT'].dt.date >= start_date) & (prod_data['DATE_DT'].dt.date <= end_date)]
     
     # Création des onglets
-    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 SETUP 2", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
+    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 TL Setup", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
     
     with t_tl:
-        st.subheader("📋 Vos activités - SETUP 2")
+        st.subheader("📋 Vos activités - TL Setup")
         
         if not tl_data.empty:
             col1, col2, col3, col4 = st.columns(4)
@@ -2022,7 +2022,7 @@ elif st.session_state.user_role == "jynyaina":
             with st.expander("📋 Détail de vos activités TL", expanded=False):
                 st.dataframe(tl_data.drop(columns=['DATE_DT', 'Total_Sec']), use_container_width=True)
         else:
-            st.info("Aucune donnée SETUP 2 sur cette période")
+            st.info("Aucune donnée TL Setup sur cette période")
     
     with t_match:
         st.subheader("🎯 Vos activités - Match Setup")
@@ -2077,7 +2077,7 @@ elif st.session_state.user_role == "jynyaina":
         with col2:
             st.metric("⏱️ Temps Total Global", format_duration(temps_global))
         with col3:
-            st.metric("📋 Total SETUP 2", f"{total_tl:,}")
+            st.metric("📋 Total TL Setup", f"{total_tl:,}")
         with col4:
             st.metric("⏱️ Temps TL", format_duration(temps_tl))
         
@@ -2107,7 +2107,7 @@ elif st.session_state.user_role == "jynyaina":
             st.markdown("### 📊 Répartition des activités")
             if total_global > 0:
                 repartition = pd.DataFrame({
-                    'Activité': ['SETUP 2', 'Match Setup', 'Prod Setup'],
+                    'Activité': ['TL Setup', 'Match Setup', 'Prod Setup'],
                     'Nombre': [total_tl, total_match, total_prod]
                 })
                 st.bar_chart(repartition.set_index('Activité'), color="#0284c7")
