@@ -1,7 +1,58 @@
 import streamlit as st
 import pandas as pd
+import time
+from datetime import datetime
+from functools import wraps
+import traceback
 
+# ============================================
+# COUCHE DE ROBUSTESSE - NE RIEN MODIFIE DE LA LOGIQUE
+# ============================================
+
+# Gestionnaire de timeout de session silencieux
+if 'authenticated' in st.session_state and st.session_state.authenticated:
+    if 'last_activity' not in st.session_state:
+        st.session_state.last_activity = datetime.now()
+    elif (datetime.now() - st.session_state.last_activity).seconds > 3600:
+        for key in ['authenticated', 'dashboard_type', 'user_role', 'last_activity']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.rerun()
+    else:
+        st.session_state.last_activity = datetime.now()
+
+# Décorateur de sécurité pour les chargements
+def safe_load(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        for attempt in range(3):
+            try:
+                result = func(*args, **kwargs)
+                if result is not None and not result.empty:
+                    return result
+                time.sleep(0.5 * (attempt + 1))
+            except Exception as e:
+                if attempt == 2:
+                    st.toast(f"⚠️ Erreur: {str(e)[:50]}", icon="⚠️")
+                    return pd.DataFrame()
+                time.sleep(0.5 * (attempt + 1))
+        return pd.DataFrame()
+    return wrapper
+
+# Nettoyage silencieux des DataFrames
+def clean_df(df, cols):
+    if df.empty:
+        return df
+    df = df.drop_duplicates()
+    df = df.dropna(how='all')
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = df[col].astype(str).str.strip()
+    return df
+
+# ============================================
 # 1. CONFIGURATION & DESIGN DYNAMIQUE (TOUJOURS EN PREMIER)
+# ============================================
 st.set_page_config(page_title="AlphaProject | Master Dashboard", layout="wide", page_icon="🛡️")
 
 # --- GESTION DE L'AUTHENTIFICATION ---
@@ -35,26 +86,37 @@ if not st.session_state.authenticated:
                 if username == "AlphaProject" and password == "Alpha2026":
                     st.session_state.authenticated = True
                     st.session_state.user_role = "admin"
+                    st.session_state.last_activity = datetime.now()
                     st.rerun()
                 elif username == "Toky" and password == "Admin2026":
                     st.session_state.authenticated = True
                     st.session_state.user_role = "toky"
+                    st.session_state.last_activity = datetime.now()
                     st.rerun()
                 elif username == "Isaia" and password == "Isaia2026":
                     st.session_state.authenticated = True
                     st.session_state.user_role = "isaia"
+                    st.session_state.last_activity = datetime.now()
                     st.rerun()
                 elif username == "Zara" and password == "Zara2026":
                     st.session_state.authenticated = True
                     st.session_state.user_role = "zara"
+                    st.session_state.last_activity = datetime.now()
                     st.rerun()
                 elif username == "Vanja" and password == "Vanja2026":
                     st.session_state.authenticated = True
                     st.session_state.user_role = "vanja"
+                    st.session_state.last_activity = datetime.now()
                     st.rerun()
                 elif username == "Ny Haingo" and password == "Ny Haingo2026":
                     st.session_state.authenticated = True
                     st.session_state.user_role = "nyhaingo"
+                    st.session_state.last_activity = datetime.now()
+                    st.rerun()
+                elif username == "Jy Ny Aina" and password == "Jy Ny Aina2026":
+                    st.session_state.authenticated = True
+                    st.session_state.user_role = "jynyaina"
+                    st.session_state.last_activity = datetime.now()
                     st.rerun()
                 else:
                     st.error("❌ Identifiants incorrects. Accès refusé.")
@@ -116,6 +178,14 @@ with st.sidebar:
                 <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(0,0,0,0), rgba(14,165,233,0.75), rgba(0,0,0,0));">
             </div>
         """, unsafe_allow_html=True)
+    elif st.session_state.user_role == "jynyaina":
+        st.markdown("""
+            <div style="text-align: center; margin-top: -15px; margin-bottom: 20px;">
+                <h3 style="color: #0ea5e9; font-family: sans-serif; letter-spacing: 2px;">Dashboard Personnel</h3>
+                <p style="font-size: 0.8em; opacity: 0.7;">Jy Ny Aina</p>
+                <hr style="border: 0; height: 1px; background-image: linear-gradient(to right, rgba(0,0,0,0), rgba(14,165,233,0.75), rgba(0,0,0,0));">
+            </div>
+        """, unsafe_allow_html=True)
     
     # Sélecteur de dashboard (uniquement pour admin)
     if st.session_state.user_role == "admin":
@@ -136,9 +206,15 @@ with st.sidebar:
     # Bouton de déconnexion
     st.markdown("---")
     if st.button("🚪 Se déconnecter", use_container_width=True):
-        st.session_state.authenticated = False
-        st.session_state.user_role = None
+        for key in ['authenticated', 'dashboard_type', 'user_role', 'last_activity']:
+            if key in st.session_state:
+                del st.session_state[key]
         st.rerun()
+    
+    # Bouton refresh cache silencieux
+    if st.button("🔄 Actualiser", use_container_width=True):
+        st.cache_data.clear()
+        st.toast("✅ Données actualisées", icon="🔄")
 
 # CSS Adaptatif Premium
 st.markdown("""
@@ -231,16 +307,14 @@ if st.session_state.user_role == "admin" and st.session_state.dashboard_type == 
         m, s = divmod(m, 60)
         return f"{h}:{m:02d}:{s:02d}"
 
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1)
-            df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
-            return df
-        except:
-            return pd.DataFrame()
+        df = pd.read_csv(url, header=None, skiprows=start_row-1)
+        df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
+        return clean_df(df, df.columns)
 
     st.markdown("""
         <div style='text-align: left; margin-bottom: 30px; border-left: 8px solid #0ea5e9; padding-left: 15px;'>
@@ -389,30 +463,28 @@ elif st.session_state.user_role == "admin" and st.session_state.dashboard_type =
         s = int(seconds % 60)
         return f"{h}:{m:02d}:{s:02d}"
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_data_optimized(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
-            df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            
-            def convert_duration(dur):
-                try:
-                    if pd.isna(dur) or str(dur).strip() == "":
-                        return 0.0
-                    parts = str(dur).strip().split(':')
-                    if len(parts) == 3:
-                        return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
-                    elif len(parts) == 2:
-                        return int(parts[0])*60 + int(parts[1])
+        df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
+        df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        
+        def convert_duration(dur):
+            try:
+                if pd.isna(dur) or str(dur).strip() == "":
                     return 0.0
-                except:
-                    return 0.0
-            
-            df['Durée_Sec'] = df['Durée'].apply(convert_duration)
-            return df
-        except Exception as e:
-            return pd.DataFrame()
+                parts = str(dur).strip().split(':')
+                if len(parts) == 3:
+                    return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0])*60 + int(parts[1])
+                return 0.0
+            except:
+                return 0.0
+        
+        df['Durée_Sec'] = df['Durée'].apply(convert_duration)
+        return clean_df(df, df.columns)
     
     df_match = load_data_optimized(MATCH_URL, 2467)
     df_prod = load_data_optimized(PROD_URL, 1014)
@@ -631,41 +703,37 @@ elif st.session_state.user_role == "toky":
             return 0.0
         except: return None
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_tl_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1)
-            df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
-            return df
-        except:
-            return pd.DataFrame()
+        df = pd.read_csv(url, header=None, skiprows=start_row-1)
+        df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
+        return clean_df(df, df.columns)
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_match_prod_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
-            df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            
-            def convert_duration(dur):
-                try:
-                    if pd.isna(dur) or str(dur).strip() == "":
-                        return 0.0
-                    parts = str(dur).strip().split(':')
-                    if len(parts) == 3:
-                        return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
-                    elif len(parts) == 2:
-                        return int(parts[0])*60 + int(parts[1])
+        df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
+        df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        
+        def convert_duration(dur):
+            try:
+                if pd.isna(dur) or str(dur).strip() == "":
                     return 0.0
-                except:
-                    return 0.0
-            
-            df['Durée_Sec'] = df['Durée'].apply(convert_duration)
-            return df
-        except Exception as e:
-            return pd.DataFrame()
+                parts = str(dur).strip().split(':')
+                if len(parts) == 3:
+                    return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0])*60 + int(parts[1])
+                return 0.0
+            except:
+                return 0.0
+        
+        df['Durée_Sec'] = df['Durée'].apply(convert_duration)
+        return clean_df(df, df.columns)
     
     # Chargement des données Toky
     tl_data = load_tl_data(AGENTS_URLS["Toky"], START_ROWS["Toky"])
@@ -880,41 +948,37 @@ elif st.session_state.user_role == "isaia":
             return 0.0
         except: return None
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_tl_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1)
-            df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
-            return df
-        except:
-            return pd.DataFrame()
+        df = pd.read_csv(url, header=None, skiprows=start_row-1)
+        df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
+        return clean_df(df, df.columns)
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_match_prod_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
-            df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            
-            def convert_duration(dur):
-                try:
-                    if pd.isna(dur) or str(dur).strip() == "":
-                        return 0.0
-                    parts = str(dur).strip().split(':')
-                    if len(parts) == 3:
-                        return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
-                    elif len(parts) == 2:
-                        return int(parts[0])*60 + int(parts[1])
+        df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
+        df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        
+        def convert_duration(dur):
+            try:
+                if pd.isna(dur) or str(dur).strip() == "":
                     return 0.0
-                except:
-                    return 0.0
-            
-            df['Durée_Sec'] = df['Durée'].apply(convert_duration)
-            return df
-        except Exception as e:
-            return pd.DataFrame()
+                parts = str(dur).strip().split(':')
+                if len(parts) == 3:
+                    return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0])*60 + int(parts[1])
+                return 0.0
+            except:
+                return 0.0
+        
+        df['Durée_Sec'] = df['Durée'].apply(convert_duration)
+        return clean_df(df, df.columns)
     
     # Chargement des données Isaia
     tl_data = load_tl_data(AGENTS_URLS["Isaia"], START_ROWS["Isaia"])
@@ -1129,41 +1193,37 @@ elif st.session_state.user_role == "zara":
             return 0.0
         except: return None
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_tl_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1)
-            df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
-            return df
-        except:
-            return pd.DataFrame()
+        df = pd.read_csv(url, header=None, skiprows=start_row-1)
+        df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
+        return clean_df(df, df.columns)
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_match_prod_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
-            df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            
-            def convert_duration(dur):
-                try:
-                    if pd.isna(dur) or str(dur).strip() == "":
-                        return 0.0
-                    parts = str(dur).strip().split(':')
-                    if len(parts) == 3:
-                        return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
-                    elif len(parts) == 2:
-                        return int(parts[0])*60 + int(parts[1])
+        df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
+        df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        
+        def convert_duration(dur):
+            try:
+                if pd.isna(dur) or str(dur).strip() == "":
                     return 0.0
-                except:
-                    return 0.0
-            
-            df['Durée_Sec'] = df['Durée'].apply(convert_duration)
-            return df
-        except Exception as e:
-            return pd.DataFrame()
+                parts = str(dur).strip().split(':')
+                if len(parts) == 3:
+                    return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0])*60 + int(parts[1])
+                return 0.0
+            except:
+                return 0.0
+        
+        df['Durée_Sec'] = df['Durée'].apply(convert_duration)
+        return clean_df(df, df.columns)
     
     # Chargement des données Zara
     tl_data = load_tl_data(AGENTS_URLS["Zara"], START_ROWS["Zara"])
@@ -1378,41 +1438,37 @@ elif st.session_state.user_role == "vanja":
             return 0.0
         except: return None
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_tl_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1)
-            df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
-            return df
-        except:
-            return pd.DataFrame()
+        df = pd.read_csv(url, header=None, skiprows=start_row-1)
+        df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
+        return clean_df(df, df.columns)
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_match_prod_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
-            df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            
-            def convert_duration(dur):
-                try:
-                    if pd.isna(dur) or str(dur).strip() == "":
-                        return 0.0
-                    parts = str(dur).strip().split(':')
-                    if len(parts) == 3:
-                        return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
-                    elif len(parts) == 2:
-                        return int(parts[0])*60 + int(parts[1])
+        df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
+        df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        
+        def convert_duration(dur):
+            try:
+                if pd.isna(dur) or str(dur).strip() == "":
                     return 0.0
-                except:
-                    return 0.0
-            
-            df['Durée_Sec'] = df['Durée'].apply(convert_duration)
-            return df
-        except Exception as e:
-            return pd.DataFrame()
+                parts = str(dur).strip().split(':')
+                if len(parts) == 3:
+                    return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0])*60 + int(parts[1])
+                return 0.0
+            except:
+                return 0.0
+        
+        df['Durée_Sec'] = df['Durée'].apply(convert_duration)
+        return clean_df(df, df.columns)
     
     # Chargement des données Vanja
     tl_data = load_tl_data(AGENTS_URLS["Vanja"], START_ROWS["Vanja"])
@@ -1627,41 +1683,37 @@ elif st.session_state.user_role == "nyhaingo":
             return 0.0
         except: return None
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_tl_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1)
-            df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
-            return df
-        except:
-            return pd.DataFrame()
+        df = pd.read_csv(url, header=None, skiprows=start_row-1)
+        df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
+        return clean_df(df, df.columns)
     
-    @st.cache_data(ttl=60)
+    @st.cache_data(ttl=300)
+    @safe_load
     def load_match_prod_data(url, start_row):
-        try:
-            df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
-            df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
-            df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
-            
-            def convert_duration(dur):
-                try:
-                    if pd.isna(dur) or str(dur).strip() == "":
-                        return 0.0
-                    parts = str(dur).strip().split(':')
-                    if len(parts) == 3:
-                        return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
-                    elif len(parts) == 2:
-                        return int(parts[0])*60 + int(parts[1])
+        df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
+        df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        
+        def convert_duration(dur):
+            try:
+                if pd.isna(dur) or str(dur).strip() == "":
                     return 0.0
-                except:
-                    return 0.0
-            
-            df['Durée_Sec'] = df['Durée'].apply(convert_duration)
-            return df
-        except Exception as e:
-            return pd.DataFrame()
+                parts = str(dur).strip().split(':')
+                if len(parts) == 3:
+                    return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0])*60 + int(parts[1])
+                return 0.0
+            except:
+                return 0.0
+        
+        df['Durée_Sec'] = df['Durée'].apply(convert_duration)
+        return clean_df(df, df.columns)
     
     # Chargement des données Ny Haingo
     tl_data = load_tl_data(AGENTS_URLS["Ny Haingo"], START_ROWS["Ny Haingo"])
@@ -1673,6 +1725,251 @@ elif st.session_state.user_role == "nyhaingo":
         match_data = match_data[match_data['Agent'] == "Ny Haingo"]
     if not prod_data.empty:
         prod_data = prod_data[prod_data['Agent'] == "Ny Haingo"]
+    
+    # Filtre date
+    all_dates = []
+    if not tl_data.empty:
+        all_dates.extend(tl_data['DATE_DT'].dropna().tolist())
+    if not match_data.empty:
+        all_dates.extend(match_data['DATE_DT'].dropna().tolist())
+    if not prod_data.empty:
+        all_dates.extend(prod_data['DATE_DT'].dropna().tolist())
+    
+    if all_dates:
+        min_date = min(all_dates).date()
+        max_date = max(all_dates).date()
+        date_range = st.sidebar.date_input("📅 Période d'analyse", value=(min_date, max_date))
+        
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = date_range
+        else:
+            start_date, end_date = min_date, max_date
+        
+        if not tl_data.empty:
+            tl_data = tl_data[(tl_data['DATE_DT'].dt.date >= start_date) & (tl_data['DATE_DT'].dt.date <= end_date)]
+        if not match_data.empty:
+            match_data = match_data[(match_data['DATE_DT'].dt.date >= start_date) & (match_data['DATE_DT'].dt.date <= end_date)]
+        if not prod_data.empty:
+            prod_data = prod_data[(prod_data['DATE_DT'].dt.date >= start_date) & (prod_data['DATE_DT'].dt.date <= end_date)]
+    
+    # Création des onglets
+    t_tl, t_match, t_prod, t_summary = st.tabs(["📋 TL Setup", "🎯 Match Setup", "🚀 Prod Setup", "📊 Résumé Global"])
+    
+    with t_tl:
+        st.subheader("📋 Vos activités - TL Setup")
+        
+        if not tl_data.empty:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("📦 Total Setups", f"{len(tl_data):,}")
+            with col2:
+                st.metric("⏱️ Temps Total", format_duration(tl_data['Total_Sec'].sum()))
+            with col3:
+                st.metric("📊 Temps Moyen", format_duration(tl_data['Total_Sec'].mean()))
+            with col4:
+                prod = len(tl_data) / (tl_data['Total_Sec'].sum() / 3600) if tl_data['Total_Sec'].sum() > 0 else 0
+                st.metric("⚡ Productivité", f"{prod:.1f} U/h")
+            
+            st.subheader("📊 Répartition par type de tâche")
+            task_dist = tl_data['Tâches'].value_counts()
+            st.bar_chart(task_dist, color="#0ea5e9")
+            
+            with st.expander("📋 Détail de vos activités TL", expanded=False):
+                st.dataframe(tl_data.drop(columns=['DATE_DT', 'Total_Sec']), use_container_width=True)
+        else:
+            st.info("Aucune donnée TL Setup sur cette période")
+    
+    with t_match:
+        st.subheader("🎯 Vos activités - Match Setup")
+        
+        if not match_data.empty:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📦 Total Matchs", f"{len(match_data):,}")
+            with col2:
+                st.metric("⏱️ Temps Total", format_duration(match_data['Durée_Sec'].sum()))
+            with col3:
+                st.metric("📊 Temps Moyen", format_duration(match_data['Durée_Sec'].mean()))
+            
+            with st.expander("📋 Détail de vos activités Match", expanded=False):
+                st.dataframe(match_data.drop(columns=['DATE_DT', 'Durée_Sec']), use_container_width=True)
+        else:
+            st.info("Aucune donnée Match Setup sur cette période")
+    
+    with t_prod:
+        st.subheader("🚀 Vos activités - Mis en Prod Setup")
+        
+        if not prod_data.empty:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📦 Total Productions", f"{len(prod_data):,}")
+            with col2:
+                st.metric("⏱️ Temps Total", format_duration(prod_data['Durée_Sec'].sum()))
+            with col3:
+                st.metric("📊 Temps Moyen", format_duration(prod_data['Durée_Sec'].mean()))
+            
+            with st.expander("📋 Détail de vos activités Production", expanded=False):
+                st.dataframe(prod_data.drop(columns=['DATE_DT', 'Durée_Sec']), use_container_width=True)
+        else:
+            st.info("Aucune donnée Production sur cette période")
+    
+    with t_summary:
+        st.subheader("📊 Synthèse globale de vos performances")
+        
+        total_tl = len(tl_data) if not tl_data.empty else 0
+        total_match = len(match_data) if not match_data.empty else 0
+        total_prod = len(prod_data) if not prod_data.empty else 0
+        total_global = total_tl + total_match + total_prod
+        
+        temps_tl = tl_data['Total_Sec'].sum() if not tl_data.empty else 0
+        temps_match = match_data['Durée_Sec'].sum() if not match_data.empty else 0
+        temps_prod = prod_data['Durée_Sec'].sum() if not prod_data.empty else 0
+        temps_global = temps_tl + temps_match + temps_prod
+        
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("📊 Total Opérations", f"{total_global:,}")
+        with col2:
+            st.metric("⏱️ Temps Total Global", format_duration(temps_global))
+        with col3:
+            st.metric("📋 Total TL Setup", f"{total_tl:,}")
+        with col4:
+            st.metric("⏱️ Temps TL", format_duration(temps_tl))
+        
+        col5, col6, col7, col8 = st.columns(4)
+        with col5:
+            st.metric("🎯 Total Match", f"{total_match:,}")
+        with col6:
+            st.metric("⏱️ Temps Match", format_duration(temps_match))
+        with col7:
+            st.metric("🚀 Total Prod", f"{total_prod:,}")
+        with col8:
+            st.metric("⏱️ Temps Prod", format_duration(temps_prod))
+        
+        st.markdown("---")
+        
+        col_chart1, col_chart2 = st.columns(2)
+        
+        with col_chart1:
+            st.markdown("### 📈 Évolution temporelle")
+            if not tl_data.empty:
+                weekly_tl = tl_data.groupby(pd.Grouper(key='DATE_DT', freq='W')).size()
+                st.line_chart(weekly_tl, color="#0ea5e9")
+            else:
+                st.info("Aucune donnée")
+        
+        with col_chart2:
+            st.markdown("### 📊 Répartition des activités")
+            if total_global > 0:
+                repartition = pd.DataFrame({
+                    'Activité': ['TL Setup', 'Match Setup', 'Prod Setup'],
+                    'Nombre': [total_tl, total_match, total_prod]
+                })
+                st.bar_chart(repartition.set_index('Activité'), color="#0284c7")
+            else:
+                st.info("Aucune donnée")
+        
+        st.markdown("---")
+        st.caption(f"📅 Période analysée : {start_date} → {end_date}")
+
+# ============================================
+# DASHBOARD JY NY AINA: RÉSUMÉ PERSONNALISÉ
+# ============================================
+elif st.session_state.user_role == "jynyaina":
+    st.markdown("""
+        <div style='text-align: left; margin-bottom: 30px; border-left: 8px solid #0ea5e9; padding-left: 15px;'>
+            <h1 style='font-family: sans-serif; color: #1E293B; font-size: 2.2rem; margin: 0; font-weight: 800;'>
+                👤 Jy Ny Aina | Performance Dashboard
+            </h1>
+            <p style='color: #64748B; font-size: 1.1rem; margin: 0; font-weight: 500;'>
+                Récapitulatif complet de vos activités sur toutes les plateformes
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # URLs des données
+    BASE_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS9CwN6tKKroOoWtWwdtFAxhgqW1wMyUg0lrmU8eGtfyR1lSSVZOyg5siuxO9XkUf6WQxeeZ_IGc2uy/pub?single=true&output=csv&gid="
+    
+    AGENTS_URLS = {
+        "Vanja": f"{BASE_URL}225155468",
+        "Jy N Aina": f"{BASE_URL}1253872710",
+        "Ny Haingo": f"{BASE_URL}919025018",
+        "Isaia": f"{BASE_URL}913015590",
+        "Toky": f"{BASE_URL}770981752",
+        "Zara": f"{BASE_URL}718675776"
+    }
+    
+    START_ROWS = {
+        "Vanja": 8,
+        "Jy N Aina": 541,
+        "Ny Haingo": 752,
+        "Isaia": 702,
+        "Toky": 435,
+        "Zara": 424
+    }
+    
+    MATCH_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRTXy8AtQMhFzGY-dEE1PrRKgKWaOfmBygmYgIFfJhpL4ivwo8djT1tfgRRyixprh5A858Gl4a8qdYH/pub?gid=225910839&single=true&output=csv"
+    PROD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRTXy8AtQMhFzGY-dEE1PrRKgKWaOfmBygmYgIFfJhpL4ivwo8djT1tfgRRyixprh5A858Gl4a8qdYH/pub?gid=2106899222&single=true&output=csv"
+    
+    def format_duration(seconds):
+        if pd.isna(seconds) or seconds <= 0:
+            return "0:00:00"
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        s = int(seconds % 60)
+        return f"{h}:{m:02d}:{s:02d}"
+    
+    def convert_to_seconds(time_val):
+        try:
+            if pd.isna(time_val) or str(time_val).strip() in ["", "0", "0:00:00"]: return 0.0
+            parts = str(time_val).strip().split(':')
+            if len(parts) == 3: return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+            elif len(parts) == 2: return int(parts[0])*60 + int(parts[1])
+            return 0.0
+        except: return None
+    
+    @st.cache_data(ttl=300)
+    @safe_load
+    def load_tl_data(url, start_row):
+        df = pd.read_csv(url, header=None, skiprows=start_row-1)
+        df.columns = ['Start', 'Pause', 'Reprise', 'Fin', 'DATE', 'Matchs', 'League', 'Tâches', 'Statuts', 'Total', 'BreakTime', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        df['Total_Sec'] = df['Total'].apply(convert_to_seconds)
+        return clean_df(df, df.columns)
+    
+    @st.cache_data(ttl=300)
+    @safe_load
+    def load_match_prod_data(url, start_row):
+        df = pd.read_csv(url, header=None, skiprows=start_row-1, usecols=[4, 6, 8, 11])
+        df.columns = ['DATE', 'Agent', 'Durée', 'REMARQUES']
+        df['DATE_DT'] = pd.to_datetime(df['DATE'], dayfirst=True, errors='coerce')
+        
+        def convert_duration(dur):
+            try:
+                if pd.isna(dur) or str(dur).strip() == "":
+                    return 0.0
+                parts = str(dur).strip().split(':')
+                if len(parts) == 3:
+                    return int(parts[0])*3600 + int(parts[1])*60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0])*60 + int(parts[1])
+                return 0.0
+            except:
+                return 0.0
+        
+        df['Durée_Sec'] = df['Durée'].apply(convert_duration)
+        return clean_df(df, df.columns)
+    
+    # Chargement des données Jy Ny Aina
+    tl_data = load_tl_data(AGENTS_URLS["Jy N Aina"], START_ROWS["Jy N Aina"])
+    match_data = load_match_prod_data(MATCH_URL, 2467)
+    prod_data = load_match_prod_data(PROD_URL, 1014)
+    
+    # Filtrage des données pour Jy Ny Aina uniquement
+    if not match_data.empty:
+        match_data = match_data[match_data['Agent'] == "Ny Aina"]
+    if not prod_data.empty:
+        prod_data = prod_data[prod_data['Agent'] == "Ny Aina"]
     
     # Filtre date
     all_dates = []
